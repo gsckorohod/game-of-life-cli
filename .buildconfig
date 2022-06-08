@@ -1,0 +1,14 @@
+[default]
+name=Default
+runtime=host
+toolchain=default
+config-opts=
+run-opts=
+prefix=/home/mayday/.cache/gnome-builder/install/game-of-life/host
+app-id=
+postbuild=
+prebuild=
+default=true
+
+[default.environment]
+PATH=/home/mayday/.cargo/bin:/home/mayday/.cabal/bin:/home/mayday/.ghcup/bin:/home/mayday/.local/bin:/home/mayday/bin:/usr/lib64/ccache:/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin\n
