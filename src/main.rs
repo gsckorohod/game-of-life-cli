@@ -8,6 +8,8 @@ use std::io::{Read, Write, stdout, stdin};
 use std::thread::sleep;
 use std::time::Duration;
 use std::cmp::max;
+use std::collections::VecDeque;
+use std::result;
 
 
 const DEAD: &str = "  ";
@@ -17,19 +19,24 @@ const BORDER_H: &str = "══";
 const BORDER_V: char = '║';
 const SELECTED_DEAD: &str = "░░";
 const SELECTED_ALIVE: &str = "▒▒";
+const HISTORY_LEN: usize = 20;
 
 
-fn write_title(stdout: &mut dyn Write) {
+fn write_title(stdout: &mut dyn Write, write_help: bool) {
     write!(stdout, "\r{}\n\r", "Game Of Life");
     write!(stdout, "{}\n\r", "------------");
-    write!(stdout, "{}\n\r", "Controls:");
-    write!(stdout, "{}\n\r", "* Arrow keys - move cursor");
-    write!(stdout, "{}\n\r", "* Space - toggle cell");
-    write!(stdout, "{}\n\r", "* R/S - [R]un / [S]top");
-    write!(stdout, "{}\n\r", "* P/N - [P]rev/[N]ext");
-    write!(stdout, "{}\n\r", "        (Single Step)");
-    write!(stdout, "{}\n\r", "* C - [C]lear");
-    write!(stdout, "{}\n\r", "------------");
+    if write_help {
+        write!(stdout, "{}\n\r", "Controls:");
+        write!(stdout, "{}\n\r", "* Arrow keys - move cursor");
+        write!(stdout, "{}\n\r", "* Space - toggle cell");
+        write!(stdout, "{}\n\r", "* R/S - [R]un / [S]top");
+        write!(stdout, "{}\n\r", "* P/N - [P]rev/[N]ext");
+        write!(stdout, "{}\n\r", "        (Single Step)");
+        write!(stdout, "{}\n\r", "* C - [C]lear");
+        write!(stdout, "{}\n\r", "* T - [T]oggle cursor");
+        write!(stdout, "{}\n\r", "* E - [E]dit settings");
+        write!(stdout, "{}\n\r", "------------");
+    }
 }
 
 
@@ -40,6 +47,8 @@ pub struct Universe {
     selected_cell: (usize, usize),
     show_cursor: bool,
     is_running: bool,
+    history: VecDeque<Vec<bool>>,
+    should_write_help: bool,
 }
 
 
@@ -52,6 +61,8 @@ impl Universe {
             selected_cell: (0, 0),
             show_cursor: false,
             is_running: false,
+            history: VecDeque::new(),
+            should_write_help: true,
         }
     }
 
@@ -68,10 +79,11 @@ impl Universe {
 
     pub fn render(&self, stdout: &mut dyn Write) {
         write!(stdout,
-           "{}{}",
+           "{}{}{}",
            termion::cursor::Goto(1, 1),
-           termion::clear::All);
-        write_title(stdout);
+           termion::clear::All,
+           termion::cursor::Hide);
+        write_title(stdout, self.should_write_help);
 
         write!(stdout, "{}", CORNERS[0]);
         for i in 0..self.width {write!(stdout, "{}", BORDER_H);}
@@ -167,7 +179,17 @@ impl Universe {
                 };
             }
         }
+        if self.history.len() >= HISTORY_LEN {self.history.pop_front();}
+        self.history.push_back(self.cells.clone());
         self.cells = next;
+    }
+
+    pub fn tick_back(&mut self) -> Result<&str, &str> {
+        match self.history.pop_back() {
+            Some(x) => {self.cells = x},
+            None => {return Err("No more moves in history!");},
+        };
+        return Ok("Returned to previous step");
     }
 
     pub fn toggle_selected_cell(&mut self) {
@@ -184,7 +206,7 @@ impl Universe {
 
 
 fn main() {
-    let mut stdin = async_stdin();
+    let stdin = async_stdin();
     let mut stdout = stdout().into_raw_mode().unwrap();
     let mut it = stdin.keys();
 
@@ -231,8 +253,20 @@ fn main() {
                     game.render(&mut stdout);
                     stdout.flush().unwrap();
                 }
+                Key::Char('p') => {
+                    match game.tick_back() {
+                        Ok(_) => {game.render(&mut stdout);}
+                        Err(msg) => {write!(stdout, "\r{}", msg).unwrap();}
+                    };
+                    stdout.flush().unwrap();
+                }
                 Key::Char('c') => {
                     game.clear();
+                    game.render(&mut stdout);
+                    stdout.flush().unwrap();
+                }
+                Key::Char('t') => {
+                    game.show_cursor = !game.show_cursor;
                     game.render(&mut stdout);
                     stdout.flush().unwrap();
                 }
@@ -245,8 +279,8 @@ fn main() {
                 Key::Char('+') => {tick_millis = max(tick_millis - 50, 50);}
                 Key::Char('q') => break,
                 other => {
-                    //write!(stdout, "Unexpected key: {:?}", other).unwrap();
-                    //stdout.flush().unwrap();
+                    write!(stdout, "Unexpected key: {:?}", other).unwrap();
+                    stdout.flush().unwrap();
                 }
             }
             _ => {}
