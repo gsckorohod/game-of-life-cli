@@ -1,9 +1,13 @@
 extern crate termion;
 
-use termion::event::Key;
+use termion::event::{Key, Event};
 use termion::input::TermRead;
+use termion::async_stdin;
 use termion::raw::IntoRawMode;
-use std::io::{Write, stdout, stdin};
+use std::io::{Read, Write, stdout, stdin};
+use std::thread::sleep;
+use std::time::Duration;
+use std::cmp::max;
 
 
 const DEAD: &str = "  ";
@@ -35,6 +39,7 @@ pub struct Universe {
     cells: Vec<bool>,
     selected_cell: (usize, usize),
     show_cursor: bool,
+    is_running: bool,
 }
 
 
@@ -46,6 +51,7 @@ impl Universe {
             cells: vec![false; width * height],
             selected_cell: (0, 0),
             show_cursor: false,
+            is_running: false,
         }
     }
 
@@ -178,49 +184,82 @@ impl Universe {
 
 
 fn main() {
-    let stdin = stdin();
+    let mut stdin = async_stdin();
     let mut stdout = stdout().into_raw_mode().unwrap();
+    let mut it = stdin.keys();
 
-    let mut game = Universe::new(20, 20);
+    let mut game = Universe::new(6, 6);
     game.show_cursor = true;
     game.render(&mut stdout);
 
-    for c in stdin.keys() {
-        match c.unwrap() {
-            Key::Up => {
-                game.move_cursor(-1, 0);
-                game.render(&mut stdout);
+    let mut tick_millis: u64 = 200;
+
+    loop {
+        sleep(Duration::from_millis(1));
+        let b = it.next();
+
+        match b {
+            Some(x) => match x.unwrap() {
+                Key::Up => {
+                    game.move_cursor(-1, 0);
+                    game.render(&mut stdout);
+                    stdout.flush().unwrap();
+                }
+                Key::Down => {
+                    game.move_cursor(1, 0);
+                    game.render(&mut stdout);
+                    stdout.flush().unwrap();
+                }
+                Key::Right => {
+                    game.move_cursor(0, 1);
+                    game.render(&mut stdout);
+                    stdout.flush().unwrap();
+                }
+                Key::Left => {
+                    game.move_cursor(0, -1);
+                    game.render(&mut stdout);
+                    stdout.flush().unwrap();
+                }
+                Key::Char('r') => {
+                    game.is_running = true;
+                }
+                Key::Char('s') => {
+                    game.is_running = false;
+                }
+                Key::Char('n') => {
+                    game.tick();
+                    game.render(&mut stdout);
+                    stdout.flush().unwrap();
+                }
+                Key::Char('c') => {
+                    game.clear();
+                    game.render(&mut stdout);
+                    stdout.flush().unwrap();
+                }
+                Key::Char(' ') => {
+                    game.toggle_selected_cell();
+                    game.render(&mut stdout);
+                    stdout.flush().unwrap();
+                }
+                Key::Char('-') => {tick_millis += 50;}
+                Key::Char('+') => {tick_millis = max(tick_millis - 50, 50);}
+                Key::Char('q') => break,
+                other => {
+                    //write!(stdout, "Unexpected key: {:?}", other).unwrap();
+                    //stdout.flush().unwrap();
+                }
             }
-            Key::Down => {
-                game.move_cursor(1, 0);
-                game.render(&mut stdout);
-            }
-            Key::Right => {
-                game.move_cursor(0, 1);
-                game.render(&mut stdout);
-            }
-            Key::Left => {
-                game.move_cursor(0, -1);
-                game.render(&mut stdout);
-            }
-            Key::Char('n') => {
-                game.tick();
-                game.render(&mut stdout);
-            }
-            Key::Char('c') => {
-                game.clear();
-                game.render(&mut stdout);
-            }
-            Key::Char(' ') => {
-                game.toggle_selected_cell();
-                game.render(&mut stdout);
-            }
-            Key::Char('q') => break,
             _ => {}
         }
-        stdout.flush().unwrap();
+
+        if game.is_running {
+            game.tick();
+            game.render(&mut stdout);
+            // write!(stdout, "{}", "game was updated by regular tick").unwrap();
+            stdout.flush().unwrap();
+            sleep(Duration::from_millis(tick_millis));
+        }
     }
 
     write!(stdout, "{}", termion::cursor::Show).unwrap();
-
 }
