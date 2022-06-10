@@ -19,7 +19,9 @@ const BORDER_H: &str = "══";
 const BORDER_V: char = '║';
 const SELECTED_DEAD: &str = "░░";
 const SELECTED_ALIVE: &str = "▒▒";
-const HISTORY_LEN: usize = 20;
+const HISTORY_LEN_DEFAULT: usize = 20;
+const SIZE_ROWS_DEFAULT: usize = 10;
+const SIZE_COLS_DEFAULT: usize = 10;
 
 
 fn write_title(stdout: &mut dyn Write, write_help: bool) {
@@ -34,7 +36,6 @@ fn write_title(stdout: &mut dyn Write, write_help: bool) {
         write!(stdout, "{}\n\r", "        (Single Step)");
         write!(stdout, "{}\n\r", "* C - [C]lear");
         write!(stdout, "{}\n\r", "* T - [T]oggle cursor");
-        write!(stdout, "{}\n\r", "* E - [E]dit settings");
         write!(stdout, "{}\n\r", "------------");
     }
 }
@@ -49,6 +50,7 @@ pub struct Universe {
     is_running: bool,
     history: VecDeque<Vec<bool>>,
     should_write_help: bool,
+    history_len: usize,
 }
 
 
@@ -63,6 +65,7 @@ impl Universe {
             is_running: false,
             history: VecDeque::new(),
             should_write_help: true,
+            history_len: HISTORY_LEN_DEFAULT,
         }
     }
 
@@ -179,7 +182,7 @@ impl Universe {
                 };
             }
         }
-        if self.history.len() >= HISTORY_LEN {self.history.pop_front();}
+        if self.history.len() >= self.history_len {self.history.pop_front();}
         self.history.push_back(self.cells.clone());
         self.cells = next;
     }
@@ -210,7 +213,7 @@ fn main() {
     let mut stdout = stdout().into_raw_mode().unwrap();
     let mut it = stdin.keys();
 
-    let mut game = Universe::new(6, 6);
+    let mut game = Universe::new(SIZE_ROWS_DEFAULT, SIZE_COLS_DEFAULT);
     game.show_cursor = true;
     game.render(&mut stdout);
 
@@ -256,7 +259,9 @@ fn main() {
                 Key::Char('p') => {
                     match game.tick_back() {
                         Ok(_) => {game.render(&mut stdout);}
-                        Err(msg) => {write!(stdout, "\r{}", msg).unwrap();}
+                        Err(msg) => {write!(stdout, "\r{}{}",
+                                                     termion::clear::CurrentLine,
+                                                     msg).unwrap();}
                     };
                     stdout.flush().unwrap();
                 }
