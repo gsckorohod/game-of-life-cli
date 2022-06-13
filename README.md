@@ -12,4 +12,6 @@ Features:
 Todo:
   - More colorful formatting
   - Command line options
+    * Setting field size: done
+    * Print help: done
   - Saving the game state in a file (?)

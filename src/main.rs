@@ -1,15 +1,16 @@
 extern crate termion;
 
-use termion::event::{Key, Event};
+use termion::event::Key;
 use termion::input::TermRead;
 use termion::async_stdin;
 use termion::raw::IntoRawMode;
-use std::io::{Read, Write, stdout, stdin};
+use std::io::{Write, stdout};
 use std::thread::sleep;
 use std::time::Duration;
 use std::cmp::max;
 use std::collections::VecDeque;
-use std::result;
+use std::env;
+use std::process::exit;
 
 
 const DEAD: &str = "  ";
@@ -209,11 +210,32 @@ impl Universe {
 
 
 fn main() {
+    let args: Vec<String> = env::args().collect();
+
     let stdin = async_stdin();
     let mut stdout = stdout().into_raw_mode().unwrap();
     let mut it = stdin.keys();
 
-    let mut game = Universe::new(SIZE_ROWS_DEFAULT, SIZE_COLS_DEFAULT);
+    if (args.len() >= 2) && args[1].to_lowercase().contains("help") {
+        write!(stdout, "\r{}\n\r", "Game Of Life");
+        write!(stdout, "\r{}\n\r", "Args: game-of-life <rows> <cols>");
+        exit(0);
+    }
+
+    let mut sz_rows = SIZE_ROWS_DEFAULT;
+    let mut sz_cols = SIZE_COLS_DEFAULT;
+    if args.len() >= 3 {
+        sz_rows = match args[1].parse() {
+            Ok(r) => r,
+            Err(_) => SIZE_ROWS_DEFAULT,
+        };
+        sz_cols = match args[2].parse() {
+            Ok(c) => c,
+            Err(_) => SIZE_ROWS_DEFAULT,
+        };
+    }
+
+    let mut game = Universe::new(sz_rows, sz_cols);
     game.show_cursor = true;
     game.render(&mut stdout);
 
